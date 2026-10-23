@@ -1,0 +1,372 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Ordering Puzzle</title>
+
+  <style>
+    :root {
+      --border-color: #d94646;
+      --border-width: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      border: var(--border-width) solid var(--border-color);
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      transition: border-color 0.25s ease;
+    }
+
+    body.correct {
+      --border-color: #16a34a;
+    }
+
+    header {
+      padding: 24px 16px;
+      text-align: center;
+      background: white;
+      box-shadow: 0 2px 6px #0001;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 4vw, 2.3rem);
+    }
+
+    #status {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #b91c1c;
+    }
+
+    body.correct #status {
+      color: #15803d;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: auto;
+      padding: 24px;
+    }
+
+    #images {
+      display: grid;
+      grid-template-columns:
+        repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+    }
+
+    .tile {
+      min-width: 0;
+      padding: 10px;
+      background: white;
+      border: 2px solid #d1d5db;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px #0001;
+      cursor: grab;
+      user-select: none;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    .tile:active {
+      cursor: grabbing;
+    }
+
+    .tile.dragging {
+      opacity: 0.4;
+      transform: scale(0.96);
+    }
+
+    .tile img {
+      display: block;
+      width: 100%;
+      height: 190px;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .tile .filename {
+      margin-top: 10px;
+      text-align: center;
+      overflow-wrap: anywhere;
+      font-size: 0.9rem;
+    }
+
+    .tile:focus-visible {
+      outline: 3px solid #2563eb;
+      outline-offset: 3px;
+    }
+
+    .controls {
+      margin: 24px 0 8px;
+      text-align: center;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .hint {
+      text-align: center;
+      color: #4b5563;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 500px) {
+      main {
+        padding: 14px;
+      }
+
+      #images {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .tile img {
+        height: 140px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Image Ordering Puzzle</h1>
+    <div id="status" role="status" aria-live="polite">
+      Loading images...
+    </div>
+  </header>
+
+  <main>
+    <p class="hint">
+      Drag images to rearrange them into the correct order.
+      The border turns green when you finish!
+    </p>
+
+    <div id="images" aria-label="Reorderable images"></div>
+
+    <div class="controls">
+      <button id="shuffle">Shuffle Images</button>
+    </div>
+  </main>
+
+  <script>
+    const ORDER_FILE = "jakeorder.txt";
+    const imageContainer = document.getElementById("images");
+    const status = document.getElementById("status");
+    const shuffleButton = document.getElementById("shuffle");
+
+    let correctOrder = [];
+    let draggingTile = null;
+
+    // Randomize an array using Fisher-Yates shuffle.
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function checkOrder() {
+      const tiles = [...imageContainer.children];
+
+      const isCorrect =
+        tiles.length === correctOrder.length &&
+        tiles.every((tile, index) =>
+          tile.dataset.filename === correctOrder[index]
+        );
+
+      document.body.classList.toggle("correct", isCorrect);
+
+      if (isCorrect) {
+        status.textContent = "🎉 Correct! All images are in order!";
+      } else {
+        const rightCount = tiles.filter((tile, index) =>
+          tile.dataset.filename === correctOrder[index]
+        ).length;
+
+        status.textContent =
+          `${rightCount} of ${correctOrder.length} images in the correct position`;
+      }
+    }
+
+    function moveTile(tile, target) {
+      if (!tile || !target || tile === target) return;
+
+      const tiles = [...imageContainer.children];
+      const from = tiles.indexOf(tile);
+      const to = tiles.indexOf(target);
+
+      if (from < to) {
+        imageContainer.insertBefore(tile, target.nextSibling);
+      } else {
+        imageContainer.insertBefore(tile, target);
+      }
+
+      checkOrder();
+    }
+
+    function createTile(filename) {
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.draggable = true;
+      tile.tabIndex = 0;
+      tile.setAttribute("role", "listitem");
+      tile.setAttribute(
+        "aria-label",
+        filename + ". Use arrow keys to rearrange."
+      );
+      tile.dataset.filename = filename;
+
+      const img = document.createElement("img");
+      img.src = filename;
+      img.alt = filename;
+
+      img.addEventListener("error", () => {
+        status.textContent = `Could not load ${filename}`;
+        document.body.classList.remove("correct");
+      });
+
+      const label = document.createElement("div");
+      label.className = "filename";
+      label.textContent = filename;
+
+      tile.append(img, label);
+
+      tile.addEventListener("dragstart", event => {
+        draggingTile = tile;
+        tile.classList.add("dragging");
+
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", filename);
+      });
+
+      tile.addEventListener("dragend", () => {
+        tile.classList.remove("dragging");
+        draggingTile = null;
+      });
+
+      tile.addEventListener("dragover", event => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      });
+
+      tile.addEventListener("drop", event => {
+        event.preventDefault();
+        moveTile(draggingTile, tile);
+      });
+
+      // Keyboard support: move an image with arrow keys.
+      tile.addEventListener("keydown", event => {
+        if (event.key !== "ArrowLeft" &&
+            event.key !== "ArrowRight" &&
+            event.key !== "ArrowUp" &&
+            event.key !== "ArrowDown") return;
+
+        event.preventDefault();
+
+        const tiles = [...imageContainer.children];
+        const index = tiles.indexOf(tile);
+
+        let nextIndex = index;
+
+        if (event.key === "ArrowLeft" ||
+            event.key === "ArrowUp") {
+          nextIndex--;
+        } else {
+          nextIndex++;
+        }
+
+        if (nextIndex < 0 || nextIndex >= tiles.length) return;
+
+        const target = tiles[nextIndex];
+
+        if (nextIndex < index) {
+          imageContainer.insertBefore(tile, target);
+        } else {
+          imageContainer.insertBefore(tile, target.nextSibling);
+        }
+
+        tile.focus();
+        checkOrder();
+      });
+
+      return tile;
+    }
+
+    function shuffleTiles() {
+      const tiles = shuffleArray(
+        [...imageContainer.children]
+      );
+
+      imageContainer.replaceChildren(...tiles);
+      checkOrder();
+    }
+
+    async function initialize() {
+      try {
+        const response = await fetch(ORDER_FILE, {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Could not read ${ORDER_FILE} (${response.status})`
+          );
+        }
+
+        const text = await response.text();
+
+        correctOrder = text
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(line => line && !line.startsWith("#"));
+
+        // Remove accidental duplicate filenames.
+        correctOrder = [...new Set(correctOrder)];
+
+        if (correctOrder.length === 0) {
+          throw new Error("The order file is empty.");
+        }
+
+        imageContainer.setAttribute("role", "list");
+
+        // Create the images in the order specified in order.txt.
+        const tiles = correctOrder.map(createTile);
+
+        // Shuffle before displaying the images.
+        shuffleArray(tiles);
+        imageContainer.replaceChildren(...tiles);
+
+        checkOrder();
+      } catch (error) {
+        status.textContent = "Error: " + error.message;
+        console.error(error);
+      }
+    }
+
+    shuffleButton.addEventListener("click", shuffleTiles);
+
+    initialize();
+  </script>
+</body>
+</html>
