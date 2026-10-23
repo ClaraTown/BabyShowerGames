@@ -76,6 +76,10 @@
       transition: border-color 0.15s, transform 0.15s;
     }
 
+    .drag-handle {
+      display: none;
+    }
+
     .tile:active {
       cursor: grabbing;
     }
@@ -143,6 +147,19 @@
       .tile img {
         height: 140px;
       }
+
+      .drag-handle {
+        display: block;
+        margin: -2px 0 8px;
+        padding: 8px;
+        border-radius: 6px;
+        background: #e5e7eb;
+        color: #374151;
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: bold;
+        touch-action: none;
+      }
     }
   </style>
 </head>
@@ -176,6 +193,7 @@
 
     let correctOrder = [];
     let draggingTile = null;
+    let touchDraggingTile = null;
 
     // Randomize an array using Fisher-Yates shuffle.
     function shuffleArray(array) {
@@ -237,6 +255,11 @@
       );
       tile.dataset.filename = filename;
 
+      const dragHandle = document.createElement("div");
+      dragHandle.className = "drag-handle";
+      dragHandle.textContent = "↕ Hold and drag to move";
+      dragHandle.setAttribute("aria-hidden", "true");
+
       const img = document.createElement("img");
       img.src = filename;
       img.alt = filename;
@@ -250,7 +273,7 @@
       label.className = "filename";
       label.textContent = filename;
 
-      tile.append(img, label);
+      tile.append(dragHandle, img, label);
 
       tile.addEventListener("dragstart", event => {
         draggingTile = tile;
@@ -274,6 +297,15 @@
         event.preventDefault();
         moveTile(draggingTile, tile);
       });
+
+      // Mobile Safari does not support HTML drag-and-drop. Use touch events
+      // from a dedicated handle so the rest of the page can still scroll.
+      tile.addEventListener("touchstart", event => {
+        if (!event.target.closest(".drag-handle") || event.touches.length !== 1) return;
+
+        touchDraggingTile = tile;
+        tile.classList.add("dragging");
+      }, { passive: true });
 
       // Keyboard support: move an image with arrow keys.
       tile.addEventListener("keydown", event => {
@@ -312,6 +344,28 @@
 
       return tile;
     }
+
+    imageContainer.addEventListener("touchmove", event => {
+      if (!touchDraggingTile) return;
+
+      event.preventDefault();
+      const touch = event.touches[0];
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)
+        ?.closest(".tile");
+
+      if (target && imageContainer.contains(target)) {
+        moveTile(touchDraggingTile, target);
+      }
+    }, { passive: false });
+
+    function finishTouchDrag() {
+      if (!touchDraggingTile) return;
+      touchDraggingTile.classList.remove("dragging");
+      touchDraggingTile = null;
+    }
+
+    imageContainer.addEventListener("touchend", finishTouchDrag);
+    imageContainer.addEventListener("touchcancel", finishTouchDrag);
 
     function shuffleTiles() {
       const tiles = shuffleArray(
