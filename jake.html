@@ -97,13 +97,6 @@
       pointer-events: none;
     }
 
-    .tile .filename {
-      margin-top: 10px;
-      text-align: center;
-      overflow-wrap: anywhere;
-      font-size: 0.9rem;
-    }
-
     .tile:focus-visible {
       outline: 3px solid #2563eb;
       outline-offset: 3px;
@@ -269,11 +262,7 @@
         document.body.classList.remove("correct");
       });
 
-      const label = document.createElement("div");
-      label.className = "filename";
-      label.textContent = filename;
-
-      tile.append(dragHandle, img, label);
+      tile.append(dragHandle, img);
 
       tile.addEventListener("dragstart", event => {
         draggingTile = tile;
