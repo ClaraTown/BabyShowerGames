@@ -1,0 +1,5 @@
+Jake/PainterJake.heic	Jess/1000005203.JPG
+Jake/JakeCello.jpg	Jess/1000005200.JPG  
+Jake/JakeGrad.jpg	Jess/1000005205.JPG 
+Jake/JakeBaseBall.jpg	Jess/1000005190.JPG 
+Jake/JakeBryce.jpeg	Jess/1000005202.JPG 

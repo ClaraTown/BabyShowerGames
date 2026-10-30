@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Which Is Jake?</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 20px;
+      border: 14px solid #d94646;
+      background: #f4f6f8;
+      color: #111827;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 8px 0 12px;
+    }
+
+    #score {
+      margin-bottom: 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    #choices {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      max-width: 900px;
+      margin: 0 auto 20px;
+    }
+
+    .choice {
+      min-width: 0;
+      padding: 8px;
+      border: 5px solid transparent;
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .choice:disabled {
+      cursor: default;
+    }
+
+    .choice.correct {
+      border-color: #16a34a;
+    }
+
+    .choice.incorrect {
+      border-color: #dc2626;
+    }
+
+    .choice img {
+      display: block;
+      width: 100%;
+      height: min(58vh, 520px);
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    #question {
+      min-height: 1.5em;
+      margin: 12px 0;
+      font-size: clamp(1.5rem, 5vw, 2.25rem);
+      font-weight: bold;
+    }
+
+    #message {
+      min-height: 1.5em;
+      font-size: 1rem;
+    }
+
+    #restart {
+      display: none;
+      padding: 12px 20px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 12px;
+      }
+
+      #choices {
+        gap: 8px;
+      }
+
+      .choice {
+        padding: 4px;
+        border-width: 4px;
+      }
+
+      .choice img {
+        height: 48vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Baby Photo Quiz</h1>
+  <div id="score" aria-live="polite">Correct: 0 out of 0</div>
+  <div id="choices" aria-label="Choose a photo"></div>
+  <div id="question" aria-live="polite"></div>
+  <div id="message" role="status" aria-live="polite">Loading photo pairs...</div>
+  <button id="restart" type="button">Play Again</button>
+
+  <script>
+    const choices = document.getElementById("choices");
+    const scoreDisplay = document.getElementById("score");
+    const questionDisplay = document.getElementById("question");
+    const message = document.getElementById("message");
+    const restartButton = document.getElementById("restart");
+
+    let pairs = [];
+    let round = 0;
+    let correct = 0;
+    let tried = 0;
+    let answered = false;
+
+    function shuffle(items) {
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+      }
+      return items;
+    }
+
+    function updateScore() {
+      scoreDisplay.textContent = `Correct: ${correct} out of ${tried}`;
+    }
+
+    function showRound() {
+      if (round >= pairs.length) {
+        choices.replaceChildren();
+        questionDisplay.textContent = "Quiz complete!";
+        message.textContent = `You got ${correct} out of ${tried} correct.`;
+        restartButton.style.display = "inline-block";
+        return;
+      }
+
+      answered = false;
+      const pair = pairs[round];
+      const question = Math.random() < 0.5 ? "Jake" : "Jess";
+      const displayed = Math.random() < 0.5
+        ? [pair.jake, pair.jess]
+        : [pair.jess, pair.jake];
+
+      choices.replaceChildren();
+      questionDisplay.textContent = `Which is ${question}?`;
+      message.textContent = "";
+
+      displayed.forEach((src, index) => {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.type = "button";
+        button.setAttribute("aria-label", `Photo ${index + 1}`);
+
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "Baby photo";
+        img.addEventListener("error", () => {
+          message.textContent = `Could not load an image: ${src}`;
+        });
+
+        button.append(img);
+        button.addEventListener("click", () => answer(button, src, pair, question));
+        choices.append(button);
+      });
+    }
+
+    function answer(selectedButton, selectedSrc, pair, question) {
+      if (answered) return;
+      answered = true;
+      tried++;
+
+      const isCorrect = question === "Jake"
+        ? selectedSrc === pair.jake
+        : selectedSrc === pair.jess;
+
+      selectedButton.classList.add(isCorrect ? "correct" : "incorrect");
+      if (isCorrect) correct++;
+      updateScore();
+
+      for (const button of choices.children) button.disabled = true;
+      message.textContent = isCorrect ? "Correct!" : "Not quite.";
+
+      window.setTimeout(() => {
+        round++;
+        showRound();
+      }, 2000);
+    }
+
+    async function startQuiz() {
+      try {
+        const response = await fetch("pairs.txt", { cache: "no-store" });
+        if (!response.ok) throw new Error(`Could not read pairs.txt (${response.status})`);
+
+        const text = await response.text();
+        pairs = text.split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(Boolean)
+          .map(line => {
+            const [jake, jess] = line.split(/\s+/);
+            return { jake, jess };
+          })
+          .filter(pair => pair.jake && pair.jess);
+
+        if (!pairs.length) throw new Error("pairs.txt has no valid image pairs.");
+
+        shuffle(pairs);
+        updateScore();
+        showRound();
+      } catch (error) {
+        questionDisplay.textContent = "Unable to start the quiz";
+        message.textContent = error.message;
+        console.error(error);
+      }
+    }
+
+    restartButton.addEventListener("click", () => {
+      round = 0;
+      correct = 0;
+      tried = 0;
+      restartButton.style.display = "none";
+      shuffle(pairs);
+      updateScore();
+      showRound();
+    });
+
+    startQuiz();
+  </script>
+</body>
+</html>
