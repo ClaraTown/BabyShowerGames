@@ -1,7 +1,7 @@
 Jake/BabyJake.heic 
 Jake/PainterJake.heic
 Jake/JakeCello.jpg
-Jake/JakeBryce.jpg
+Jake/JakeBryce.jpeg
 Jake/JakeGrad.jpg
 
 
