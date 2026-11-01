@@ -1,10 +1,10 @@
 Jake/BabyJake.jpg
+Jake/JakeDuck.jpg     
+Jake/JakeSpirit.jpg    
+Jake/Jake1780s.jpg     
 Jake/JakeCello.jpg   
-Jake/JakeDuck.jpg    
-Jake/Jake1780s.jpg    
+Jake/JakeBryce.jpeg  
 Jake/JakeLiberty.jpg   
-Jake/JakeSpirit.jpg   
-Jake/JakeBryce.jpeg
 Jake/JakeGrad.jpg
 
 
