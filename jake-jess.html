@@ -24,6 +24,18 @@
       margin: 8px 0 12px;
     }
 
+    .back-link {
+      display: inline-block;
+      margin: 4px 0 12px;
+      color: #2563eb;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
     #score {
       margin-bottom: 20px;
       font-size: 1.1rem;
@@ -111,6 +123,7 @@
   </style>
 </head>
 <body>
+  <a class="back-link" href="index.html">← Back to games</a>
   <h1>Baby Photo Quiz</h1>
   <div id="score" aria-live="polite">Correct: 0 out of 0</div>
   <div id="choices" aria-label="Choose a photo"></div>
