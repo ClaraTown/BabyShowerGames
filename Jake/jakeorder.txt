@@ -1,6 +1,9 @@
-Jake/BabyJake.heic 
-Jake/PainterJake.heic
-Jake/JakeCello.jpg
+Jake/BabyJake.jpg
+Jake/JakeCello.jpg   
+Jake/JakeDuck.jpg    
+Jake/Jake1780s.jpg    
+Jake/JakeLiberty.jpg   
+Jake/JakeSpirit.jpg   
 Jake/JakeBryce.jpeg
 Jake/JakeGrad.jpg
 
