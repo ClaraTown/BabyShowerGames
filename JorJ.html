@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jake or Jess?</title>
+  <style>
+    :root {
+      --border-color: #d94646;
+      --border-width: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      border: var(--border-width) solid var(--border-color);
+      background: #f4f6f8;
+      color: #111827;
+      font-family: Arial, sans-serif;
+      transition: border-color 0.2s ease;
+    }
+
+    body.correct {
+      --border-color: #16a34a;
+    }
+
+    header {
+      padding: 24px 16px;
+      background: white;
+      box-shadow: 0 2px 6px #0001;
+      text-align: center;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 12px;
+      color: #2563eb;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 4vw, 2.3rem);
+    }
+
+    #score {
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    main {
+      max-width: 900px;
+      margin: auto;
+      padding: 24px;
+      text-align: center;
+    }
+
+    #photo {
+      display: block;
+      width: 100%;
+      height: min(58vh, 520px);
+      margin: 0 auto 18px;
+      object-fit: contain;
+    }
+
+    #timer-track {
+      width: min(100%, 500px);
+      height: 12px;
+      margin: 0 auto 8px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #d1d5db;
+    }
+
+    #timer-fill {
+      width: 100%;
+      height: 100%;
+      background: #2563eb;
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+
+    #time-left,
+    #message {
+      min-height: 1.5em;
+      margin: 8px 0;
+    }
+
+    #buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    button {
+      min-width: 130px;
+      padding: 14px 24px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.55;
+    }
+
+    @media (max-width: 500px) {
+      main {
+        padding: 14px;
+      }
+
+      #photo {
+        height: 50vh;
+      }
+
+      #buttons {
+        gap: 10px;
+      }
+
+      button {
+        min-width: 0;
+        flex: 1;
+        padding: 14px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back-link" href="index.html">← Back to games</a>
+    <h1>Jake or Jess?</h1>
+    <div id="score" role="status" aria-live="polite">Correct: 0</div>
+  </header>
+
+  <main>
+    <img id="photo" alt="Identify the baby in this photo" hidden>
+    <div id="timer-track" aria-hidden="true"><div id="timer-fill"></div></div>
+    <div id="time-left" aria-live="off">Loading photos...</div>
+    <div id="message" role="status" aria-live="polite"></div>
+    <div id="buttons">
+      <button id="jake-button" type="button" disabled>Jake</button>
+      <button id="jess-button" type="button" disabled>Jess</button>
+    </div>
+  </main>
+
+  <script>
+    const photo = document.getElementById("photo");
+    const scoreDisplay = document.getElementById("score");
+    const timerFill = document.getElementById("timer-fill");
+    const timeLeftDisplay = document.getElementById("time-left");
+    const message = document.getElementById("message");
+    const buttons = {
+      Jake: document.getElementById("jake-button"),
+      Jess: document.getElementById("jess-button")
+    };
+
+    let pictures = [];
+    let currentPicture = null;
+    let correct = 0;
+    let timeLimit = 2000;
+    let roundStartedAt = 0;
+    let timeoutId = null;
+    let animationId = null;
+    let active = false;
+
+    async function readOrder(path, person) {
+      const response = await fetch(path, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Could not read ${path} (${response.status})`);
+
+      const text = await response.text();
+      return text.split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith("#"))
+        .map(src => ({ src, person }));
+    }
+
+    function stopTimer() {
+      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(animationId);
+      timeoutId = null;
+      animationId = null;
+    }
+
+    function updateTimer() {
+      if (!active) return;
+      const elapsed = performance.now() - roundStartedAt;
+      const remaining = Math.max(0, timeLimit - elapsed);
+      timerFill.style.transform = `scaleX(${remaining / timeLimit})`;
+      timeLeftDisplay.textContent = `Time: ${(remaining / 1000).toFixed(1)} seconds`;
+      animationId = window.requestAnimationFrame(updateTimer);
+    }
+
+    function endGame(reason) {
+      active = false;
+      stopTimer();
+      for (const button of Object.values(buttons)) button.disabled = true;
+      timeLeftDisplay.textContent = reason === "Time ran out." ? "Time is up" : "Game over";
+      message.textContent = `${reason} Correct answers: ${correct}.`;
+    }
+
+    function nextPicture() {
+      currentPicture = pictures[Math.floor(Math.random() * pictures.length)];
+      photo.src = currentPicture.src;
+      photo.hidden = false;
+      message.textContent = "";
+      document.body.classList.remove("correct");
+      for (const button of Object.values(buttons)) button.disabled = false;
+
+      active = true;
+      roundStartedAt = performance.now();
+      timerFill.style.transform = "scaleX(1)";
+      timeoutId = window.setTimeout(() => endGame("Time ran out."), timeLimit);
+      updateTimer();
+    }
+
+    function choose(person) {
+      if (!active) return;
+      stopTimer();
+
+      if (person !== currentPicture.person) {
+        endGame("Incorrect.");
+        return;
+      }
+
+      correct++;
+      scoreDisplay.textContent = `Correct: ${correct}`;
+      document.body.classList.add("correct");
+      for (const button of Object.values(buttons)) button.disabled = true;
+      active = false;
+      timeLimit *= 0.9;
+      window.setTimeout(nextPicture, 200);
+    }
+
+    buttons.Jake.addEventListener("click", () => choose("Jake"));
+    buttons.Jess.addEventListener("click", () => choose("Jess"));
+
+    photo.addEventListener("error", () => {
+      if (active) endGame(`Could not load ${currentPicture.src}.`);
+    });
+
+    async function startGame() {
+      try {
+        const [jakePictures, jessPictures] = await Promise.all([
+          readOrder("Jake/jakeorder.txt", "Jake"),
+          readOrder("Jess/jessorder.txt", "Jess")
+        ]);
+        pictures = [...jakePictures, ...jessPictures];
+        if (!pictures.length) throw new Error("No pictures were found in the order files.");
+        nextPicture();
+      } catch (error) {
+        timeLeftDisplay.textContent = "";
+        message.textContent = `Unable to start: ${error.message}`;
+      }
+    }
+
+    startGame();
+  </script>
+</body>
+</html>
